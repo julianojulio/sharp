@@ -3,6 +3,7 @@
 'use strict';
 
 var sharp = require("../index");
+var fs = require("fs");
 var path = require("path");
 var imagemagick = require("imagemagick");
 var assert = require("assert");
@@ -305,4 +306,12 @@ async.series([
       });
     });
   },
+  // Stream
+  function(done) {
+    var readable = fs.createReadStream(inputJpg);
+    var transformation = sharp().resize(100);
+    var writable = fs.createWriteStream(outputJpg);
+    writable.on('finish', done);
+    readable.pipe(transformation).pipe(writable);
+  }
 ]);

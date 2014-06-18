@@ -9,7 +9,7 @@
 
 The typical use case for this high speed Node.js module is to convert large images of many formats to smaller, web-friendly JPEG, PNG and WebP images of varying dimensions.
 
-The performance of JPEG resizing is typically 8x faster than ImageMagick and GraphicsMagick, based mainly on the number of CPU cores available. Everything remains non-blocking thanks to _libuv_ and Promises/A+ are supported.
+The performance of JPEG resizing is typically 8x faster than ImageMagick and GraphicsMagick, based mainly on the number of CPU cores available. Everything remains non-blocking thanks to _libuv_, with Streams and Promises/A+ both supported.
 
 This module supports reading and writing images of JPEG, PNG and WebP to and from both Buffer objects and the filesystem. It also supports reading images of many other types from the filesystem via libmagick++ or libgraphicsmagick++ if present.
 
@@ -85,6 +85,12 @@ sharp('input.jpg').resize(300, 200).toFile('output.jpg', function(err) {
 ```
 
 ```javascript
+var transformer = sharp().resize(300, 200);
+inputStream.pipe(transformer).pipe(outputStream);
+// resize image data from inputStream and write WebP image data to outputStream
+```
+
+```javascript
 sharp('input.jpg').rotate().resize(null, 200).progressive().toBuffer(function(err, outputBuffer) {
   if (err) {
     throw err;
@@ -97,6 +103,11 @@ sharp('input.jpg').rotate().resize(null, 200).progressive().toBuffer(function(er
 sharp('input.png').rotate(180).resize(300).sharpen().quality(90).webp().then(function(outputBuffer) {
   // outputBuffer contains 300px wide, upside down, sharpened, 90% quality WebP image data
 });
+```
+
+```javascript
+var transformer = sharp().rotate(180).resize(300).sharpen().quality(90).webp();
+inputStream.pipe(transformer).pipe(outputStream);
 ```
 
 ```javascript
@@ -125,12 +136,14 @@ sharp(inputBuffer).resize(200, 200).max().jpeg().then(function(outputBuffer) {
 
 ## API
 
-### sharp(input)
+### sharp([input])
 
 Constructor to which further methods are chained. `input` can be one of:
 
 * Buffer containing JPEG, PNG or WebP image data, or
 * String containing the filename of an image, with most major formats supported.
+
+A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) Stream is returned when no input is provided.
 
 ### resize(width, [height])
 
@@ -160,7 +173,9 @@ Embed the resized image on a black background of the exact size specified.
 
 ### rotate([angle])
 
-Rotate the output image by either an explicit angle or auto-orient based on the EXIF `Orientation` tag. Mirroring is not supported.
+Rotate the output image by either an explicit angle or auto-orient based on the EXIF `Orientation` tag.
+
+Mirroring is not supported.
 
 `angle`, if present, is a Number with a value of `0`, `90`, `180` or `270`.
 
@@ -226,7 +241,7 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 ### jpeg([callback])
 
-Write JPEG image data to a Buffer.
+Write JPEG image data to a Buffer or Stream.
 
 `callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant JPEG image data.
 
@@ -234,7 +249,7 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 ### png([callback])
 
-Write PNG image data to a Buffer.
+Write PNG image data to a Buffer or Stream.
 
 `callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant PNG image data.
 
@@ -242,7 +257,7 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 ### webp([callback])
 
-Write WebP image data to a Buffer.
+Write WebP image data to a Buffer or Stream.
 
 `callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant WebP image data.
 

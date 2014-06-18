@@ -1,6 +1,8 @@
 /*jslint node: true */
 'use strict';
 
+var util = require('util');
+var Transform = require('stream').Transform;
 var Promise = require('bluebird');
 var sharp = require('./build/Release/sharp');
 
@@ -23,19 +25,28 @@ var Sharp = function(input) {
     output: '__jpeg'
   };
   if (typeof input === 'string') {
+    // Input is a filename
     this.options.fileIn = input;
   } else if (typeof input ==='object' && input instanceof Buffer) {
     if (input.length > 0) {
+      // Input is a Buffer
       this.options.bufferIn = input;
     } else {
       throw new Error('Buffer is empty');
     }
+  } else if (typeof input === 'undefined') {
+    // Input will be piped in via a Stream
+    this.options.streamIn = true;
+    // By default, output in same format as input
+    this.options.streamOut = '__input';
+    Transform.call(this);
   } else {
     throw new Error('Unsupported input ' + typeof input);
   }
   return this;
 };
 module.exports = Sharp;
+util.inherits(Sharp, Transform);
 
 Sharp.prototype.crop = function() {
   this.options.canvas = 'c';
@@ -187,12 +198,6 @@ Sharp.prototype.toFile = function(output, callback) {
   return this;
 };
 
-// Deprecated to make way for future stream support - remove in v0.6.0
-Sharp.prototype.write = require('util').deprecate(
-  Sharp.prototype.toFile,
-  '.write() is deprecated and will be removed in v0.6.0. Use .toFile() instead.'
-);
-
 Sharp.prototype.toBuffer = function(callback) {
   return this._sharp('__input', callback);
 };
@@ -214,23 +219,77 @@ Sharp.prototype.webp = function(callback) {
   Supports callback and promise variants
 */
 Sharp.prototype._sharp = function(output, callback) {
-  if (typeof callback === 'function') {
-    // I like callbacks
-    sharp.resize(this.options, output, callback);
+  if (this.options.streamIn) {
+    // I like streams
+    this.options.streamOut = output;
     return this;
   } else {
-    // I like promises
-    var options = this.options;
-    return new Promise(function(resolve, reject) {
-      sharp.resize(options, output, function(err, data) {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(data);
-        }
+    if (typeof callback === 'function') {
+      // I like callbacks
+      sharp.resize(this.options, output, callback);
+      return this;
+    } else {
+      // I like promises
+      var options = this.options;
+      return new Promise(function(resolve, reject) {
+        sharp.resize(options, output, function(err, data) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(data);
+          }
+        });
       });
-    });
+    }
   }
+};
+
+/*
+  Handle incoming Stream data
+*/
+Sharp.prototype._transform = function(chunk, encoding, callback) {
+  if (!this instanceof Transform) {
+    callback(new Error('Unexpected Stream data'));
+  } else if (typeof chunk !== 'object' || !chunk instanceof Buffer) {
+    callback(new Error('Non-Buffer chunk received'));
+  } else {
+    // Copy Buffer data
+    if (typeof this.options.bufferIn === 'undefined') {
+      // Create new Buffer
+      this.options.bufferIn = new Buffer(chunk.length);
+      chunk.copy(this.options.bufferIn);
+    } else {
+      // Append to existing Buffer
+      this.options.bufferIn = Buffer.concat(
+        [this.options.bufferIn, chunk],
+        this.options.bufferIn.length + chunk.length
+      );
+    }
+    callback();
+  }
+};
+
+/*
+  Handle outgoing Stream data
+*/
+Sharp.prototype._flush = function(callback) {
+  if (
+    typeof this.options.bufferIn !== 'object' ||
+    !this.options.bufferIn instanceof Buffer ||
+    this.options.bufferIn.length === 0
+  ) {
+    callback(new Error('Empty input stream'));
+  }
+  var self = this;
+  sharp.resize(this.options, this.options.streamOut, function(err, data) {
+    if (err) {
+      callback(err);
+    } else {
+      // Push output Buffer to output stream
+      self.push(data);
+      callback();
+    }
+  });
 };
 
 module.exports.cache = function(limit) {
