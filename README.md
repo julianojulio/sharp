@@ -48,12 +48,12 @@ The _gettext_ dependency of _libvips_ [can lead](https://github.com/lovell/sharp
 
 Compiling from source is recommended:
 
-	sudo apt-get install automake build-essential git gobject-introspection gtk-doc-tools libfftw3-dev libglib2.0-dev libjpeg-turbo8-dev libpng12-dev libwebp-dev libtiff5-dev libexif-dev libxml2-dev swig
+	sudo apt-get install automake build-essential git gobject-introspection gtk-doc-tools libglib2.0-dev libjpeg-turbo8-dev libpng12-dev libwebp-dev libtiff5-dev libexif-dev libxml2-dev swig
 	git clone https://github.com/jcupitt/libvips.git
 	cd libvips
 	git checkout 7.38
 	./bootstrap.sh
-	./configure --enable-debug=no --enable-cxx=yes --without-python --without-orc
+	./configure --enable-debug=no --enable-cxx=yes --without-python --without-orc --without-fftw
 	make
 	sudo make install
 	sudo ldconfig
@@ -67,6 +67,10 @@ Requires `libtiff4-dev` instead of `libtiff5-dev` and has [a bug](https://bugs.l
 	sudo apt-get install libtiff4-dev
 
 Then follow Ubuntu 13.x instructions.
+
+### Install libvips on Heroku
+
+[Alessandro Tagliapietra](https://github.com/alex88) maintains an [Heroku buildpack for libvips](https://github.com/alex88/heroku-buildpack-vips) and its dependencies.
 
 ## Usage examples
 
@@ -85,23 +89,26 @@ sharp('input.jpg').resize(300, 200).toFile('output.jpg', function(err) {
 ```
 
 ```javascript
-var transformer = sharp().resize(300, 200);
+var transformer = sharp().resize(300, 200).webp();
 inputStream.pipe(transformer).pipe(outputStream);
 // resize image data from inputStream and write WebP image data to outputStream
 ```
 
 ```javascript
-sharp('input.jpg').rotate().resize(null, 200).progressive().toBuffer(function(err, outputBuffer) {
+sharp('input.jpg').rotate().resize(null, 200).progressive().toBuffer(function(err, outputBuffer, info) {
+>>>>>>> master
   if (err) {
     throw err;
   }
   // outputBuffer contains 200px high progressive JPEG image data, auto-rotated using EXIF Orientation tag
+  // info.width and info.height contain the final pixel dimensions of the resized image
 });
 ```
 
 ```javascript
-sharp('input.png').rotate(180).resize(300).sharpen().quality(90).webp().then(function(outputBuffer) {
+sharp('input.png').rotate(180).resize(300).sharpen().quality(90).webp().then(function(outputBuffer, info) {
   // outputBuffer contains 300px wide, upside down, sharpened, 90% quality WebP image data
+  // info.width and info.height contain the final pixel dimensions of the resized image
 });
 ```
 
@@ -128,9 +135,10 @@ sharp('input.gif').resize(200, 300).embedBlack().webp(function(err, outputBuffer
 ```
 
 ```javascript
-sharp(inputBuffer).resize(200, 200).max().jpeg().then(function(outputBuffer) {
+sharp(inputBuffer).resize(200, 200).max().jpeg().then(function(outputBuffer, info) {
   // outputBuffer contains JPEG image data no wider than 200 pixels and no higher
   // than 200 pixels regardless of the inputBuffer image dimensions
+  // info.width and info.height contain the final pixel dimensions of the resized image
 });
 ```
 
@@ -175,11 +183,9 @@ Embed the resized image on a black background of the exact size specified.
 
 Rotate the output image by either an explicit angle or auto-orient based on the EXIF `Orientation` tag.
 
-Mirroring is not supported.
-
 `angle`, if present, is a Number with a value of `0`, `90`, `180` or `270`.
 
-Use this method without `angle` to determine the angle from EXIF data.
+Use this method without `angle` to determine the angle from EXIF data. Mirroring is currently unsupported.
 
 ### withoutEnlargement()
 
@@ -227,7 +233,10 @@ An advanced setting that switches the libvips access method to `VIPS_ACCESS_SEQU
 
 `filename` is a String containing the filename to write the image data to. The format is inferred from the extension, with JPEG, PNG, WebP and TIFF supported.
 
-`callback`, if present, is called with a single argument `(err)` containing an error message, if any.
+`callback`, if present, is called with two arguments `(err, info)` where:
+
+* `err` contains an error message, if any
+* `info` contains the final resized image dimensions in its `width` and `height` properties
 
 A Promises/A+ promise is returned when `callback` is not provided.
 
@@ -235,7 +244,11 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 Write image data to a Buffer, the format of which will match the input image. JPEG, PNG and WebP are supported.
 
-`callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant image data.
+`callback`, if present, gets three arguments `(err, buffer, info)` where:
+
+* `err` is an error message, if any
+* `buffer` is the resultant image data
+* `info` contains the final resized image dimensions in its `width` and `height` properties
 
 A Promises/A+ promise is returned when `callback` is not provided.
 
@@ -243,7 +256,11 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 Write JPEG image data to a Buffer or Stream.
 
-`callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant JPEG image data.
+`callback`, if present, gets three arguments `(err, buffer, info)` where:
+
+* `err` is an error message, if any
+* `buffer` is the resultant JPEG image data
+* `info` contains the final resized image dimensions in its `width` and `height` properties
 
 A Promises/A+ promise is returned when `callback` is not provided.
 
@@ -251,7 +268,11 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 Write PNG image data to a Buffer or Stream.
 
-`callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant PNG image data.
+`callback`, if present, gets three arguments `(err, buffer, info)` where:
+
+* `err` is an error message, if any
+* `buffer` is the resultant PNG image data
+* `info` contains the final resized image dimensions in its `width` and `height` properties
 
 A Promises/A+ promise is returned when `callback` is not provided.
 
@@ -259,7 +280,11 @@ A Promises/A+ promise is returned when `callback` is not provided.
 
 Write WebP image data to a Buffer or Stream.
 
-`callback`, if present, gets two arguments `(err, buffer)` where `err` is an error message, if any, and `buffer` is the resultant WebP image data.
+`callback`, if present, gets three arguments `(err, buffer, info)` where:
+
+* `err` is an error message, if any
+* `buffer` is the resultant WebP image data
+* `info` contains the final resized image dimensions in its `width` and `height` properties
 
 A Promises/A+ promise is returned when `callback` is not provided.
 
@@ -331,7 +356,7 @@ You can expect much greater performance with caching enabled (default) and using
 
 ## Licence
 
-Copyright 2013, 2014 Lovell Fuller and Pierre Inglebert
+Copyright 2013, 2014 Lovell Fuller, Pierre Inglebert, Jonathan Ong and Chanon Sajjamanochai
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

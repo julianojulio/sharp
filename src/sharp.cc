@@ -373,63 +373,86 @@ class ResizeWorker : public NanAsyncWorker {
     vips_colourspace(sharpened, &colourspaced, VIPS_INTERPRETATION_sRGB, NULL);
     g_object_unref(sharpened);
 
+    // Generate image tile cache when interlace output is required
+    VipsImage *cached = vips_image_new();
+    if (baton->progressive) {
+      if (vips_tilecache(colourspaced, &cached, "threaded", TRUE, "persistent", TRUE, "max_tiles", -1, NULL)) {
+        return resize_error(baton, colourspaced);
+      }
+    } else {
+      vips_copy(colourspaced, &cached, NULL);
+    }
+    g_object_unref(colourspaced);
+
     // Output
+    VipsImage *output = cached;
     if (baton->file_out == "__jpeg" || (baton->file_out == "__input" && inputImageType == JPEG)) {
       // Write JPEG to buffer
-      if (vips_jpegsave_buffer(colourspaced, &baton->buffer_out, &baton->buffer_out_len, "strip", TRUE, "Q", baton->quality, "optimize_coding", TRUE, "interlace", baton->progressive, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_jpegsave_buffer(output, &baton->buffer_out, &baton->buffer_out_len, "strip", TRUE, "Q", baton->quality, "optimize_coding", TRUE, "interlace", baton->progressive, NULL)) {
+        return resize_error(baton, output);
       }
     } else if (baton->file_out == "__png" || (baton->file_out == "__input" && inputImageType == PNG)) {
       // Write PNG to buffer
-      if (vips_pngsave_buffer(colourspaced, &baton->buffer_out, &baton->buffer_out_len, "strip", TRUE, "compression", baton->compressionLevel, "interlace", baton->progressive, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_pngsave_buffer(output, &baton->buffer_out, &baton->buffer_out_len, "strip", TRUE, "compression", baton->compressionLevel, "interlace", baton->progressive, NULL)) {
+        return resize_error(baton, output);
       }
     } else if (baton->file_out == "__webp" || (baton->file_out == "__input" && inputImageType == WEBP)) {
       // Write WEBP to buffer
-      if (vips_webpsave_buffer(colourspaced, &baton->buffer_out, &baton->buffer_out_len, "strip", TRUE, "Q", baton->quality, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_webpsave_buffer(output, &baton->buffer_out, &baton->buffer_out_len, "strip", TRUE, "Q", baton->quality, NULL)) {
+        return resize_error(baton, output);
       }
     } else if (is_jpeg(baton->file_out))  {
       // Write JPEG to file
-      if (vips_jpegsave(colourspaced, baton->file_out.c_str(), "strip", TRUE, "Q", baton->quality, "optimize_coding", TRUE, "interlace", baton->progressive, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_jpegsave(output, baton->file_out.c_str(), "strip", TRUE, "Q", baton->quality, "optimize_coding", TRUE, "interlace", baton->progressive, NULL)) {
+        return resize_error(baton, output);
       }
     } else if (is_png(baton->file_out)) {
       // Write PNG to file
-      if (vips_pngsave(colourspaced, baton->file_out.c_str(), "strip", TRUE, "compression", baton->compressionLevel, "interlace", baton->progressive, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_pngsave(output, baton->file_out.c_str(), "strip", TRUE, "compression", baton->compressionLevel, "interlace", baton->progressive, NULL)) {
+        return resize_error(baton, output);
       }
     } else if (is_webp(baton->file_out)) {
       // Write WEBP to file
-      if (vips_webpsave(colourspaced, baton->file_out.c_str(), "strip", TRUE, "Q", baton->quality, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_webpsave(output, baton->file_out.c_str(), "strip", TRUE, "Q", baton->quality, NULL)) {
+        return resize_error(baton, output);
       }
     } else if (is_tiff(baton->file_out)) {
       // Write TIFF to file
-      if (vips_tiffsave(colourspaced, baton->file_out.c_str(), "strip", TRUE, "compression", VIPS_FOREIGN_TIFF_COMPRESSION_JPEG, "Q", baton->quality, NULL)) {
-        return resize_error(baton, colourspaced);
+      if (vips_tiffsave(output, baton->file_out.c_str(), "strip", TRUE, "compression", VIPS_FOREIGN_TIFF_COMPRESSION_JPEG, "Q", baton->quality, NULL)) {
+        return resize_error(baton, output);
       }
     } else {
       (baton->err).append("Unsupported output " + baton->file_out);
     }
-    g_object_unref(colourspaced);
+    g_object_unref(output);
     vips_thread_shutdown();
   }
 
   void HandleOKCallback () {
     NanScope();
 
-    Handle<Value> argv[2] = { NanNull(), NanNull() };
+    Handle<Value> argv[3] = { NanNull(), NanNull(),  NanNull() };
     if (!baton->err.empty()) {
       // Error
       argv[0] = NanNew<String>(baton->err.data(), baton->err.size());
-    } else if (baton->buffer_out_len > 0) {
-      // Buffer
-      argv[1] = NanNewBufferHandle((char *)baton->buffer_out, baton->buffer_out_len);
-      g_free(baton->buffer_out);
+    } else {
+      // Info Object
+      Local<Object> info = NanNew<Object>();
+      info->Set(NanNew<String>("width"), NanNew<Number>(baton->width));
+      info->Set(NanNew<String>("height"), NanNew<Number>(baton->height));
+
+      if (baton->buffer_out_len > 0) {
+        // Buffer
+        argv[1] = NanNewBufferHandle((char *)baton->buffer_out, baton->buffer_out_len);
+        g_free(baton->buffer_out);
+        argv[2] = info;
+      } else {
+        // File
+        argv[1] = info;
+      }
     }
     delete baton;
-    callback->Call(2, argv);
+    callback->Call(3, argv);
     // Decrement queue length
     g_atomic_int_dec_and_test(&queue_length);
   }

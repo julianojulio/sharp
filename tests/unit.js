@@ -22,8 +22,10 @@ var inputJpgWithExif = path.join(fixturesPath, "Landscape_8.jpg"); // https://gi
 async.series([
   // Resize with exact crop
   function(done) {
-    sharp(inputJpg).resize(320, 240).toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(320, 240).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(240, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -34,8 +36,10 @@ async.series([
   },
   // Resize to fixed width
   function(done) {
-    sharp(inputJpg).resize(320).toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(320).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(261, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -46,8 +50,10 @@ async.series([
   },
   // Resize to fixed height
   function(done) {
-    sharp(inputJpg).resize(null, 320).toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(null, 320).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(391, info.width);
+      assert.strictEqual(320, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(391, features.width);
@@ -70,8 +76,10 @@ async.series([
   },
   // Upscale
   function(done) {
-    sharp(inputJpg).resize(3000).toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(3000).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(3000, info.width);
+      assert.strictEqual(2449, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(3000, features.width);
@@ -119,8 +127,10 @@ async.series([
   },
   // Resize to max width or height considering ratio (landscape)
   function(done) {
-    sharp(inputJpg).resize(320, 320).max().toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(320, 320).max().toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(261, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -131,8 +141,10 @@ async.series([
   },
   // Resize to max width or height considering ratio (portrait)
   function(done) {
-    sharp(inputTiff).resize(320, 320).max().toFile(outputJpg, function(err) {
+    sharp(inputTiff).resize(320, 320).max().toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(243, info.width);
+      assert.strictEqual(320, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(243, features.width);
@@ -143,8 +155,10 @@ async.series([
   },
   // Attempt to resize to max but only provide one dimension, so should default to crop
   function(done) {
-    sharp(inputJpg).resize(320).max().toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(320).max().toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(261, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -162,8 +176,10 @@ async.series([
   },
   // Rotate by 90 degrees, respecting output input size
   function(done) {
-    sharp(inputJpg).rotate(90).resize(320, 240).toFile(outputJpg, function(err) {
+    sharp(inputJpg).rotate(90).resize(320, 240).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(240, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -174,8 +190,10 @@ async.series([
   },
   // Input image has Orientation EXIF tag but do not rotate output
   function(done) {
-    sharp(inputJpgWithExif).resize(320).toFile(outputJpg, function(err) {
+    sharp(inputJpgWithExif).resize(320).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(426, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -186,8 +204,10 @@ async.series([
   },
   // Input image has Orientation EXIF tag value of 8 (270 degrees), auto-rotate
   function(done) {
-    sharp(inputJpgWithExif).rotate().resize(320).toFile(outputJpg, function(err) {
+    sharp(inputJpgWithExif).rotate().resize(320).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(240, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -198,8 +218,10 @@ async.series([
   },
   // Attempt to auto-rotate using image that has no EXIF
   function(done) {
-    sharp(inputJpg).rotate().resize(320).toFile(outputJpg, function(err) {
+    sharp(inputJpg).rotate().resize(320).toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(261, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(320, features.width);
@@ -220,8 +242,10 @@ async.series([
   },
   // Do not enlarge the output if the input width is already less than the output width
   function(done) {
-    sharp(inputJpg).resize(2800).withoutEnlargement().toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(2800).withoutEnlargement().toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(2725, info.width);
+      assert.strictEqual(2225, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(2725, features.width);
@@ -232,8 +256,10 @@ async.series([
   },
   // Do not enlarge the output if the input height is already less than the output height
   function(done) {
-    sharp(inputJpg).resize(null, 2300).withoutEnlargement().toFile(outputJpg, function(err) {
+    sharp(inputJpg).resize(null, 2300).withoutEnlargement().toFile(outputJpg, function(err, info) {
       if (err) throw err;
+      assert.strictEqual(2725, info.width);
+      assert.strictEqual(2225, info.height);
       imagemagick.identify(outputJpg, function(err, features) {
         if (err) throw err;
         assert.strictEqual(2725, features.width);
@@ -244,7 +270,9 @@ async.series([
   },
   // Promises/A+
   function(done) {
-    sharp(inputJpg).resize(320, 240).toFile(outputJpg).then(function() {
+    sharp(inputJpg).resize(320, 240).toFile(outputJpg).then(function(info) {
+      assert.strictEqual(320, info.width);
+      assert.strictEqual(240, info.height);      
       imagemagick.identify(outputJpg, function(err, features) {
         assert.strictEqual(320, features.width);
         assert.strictEqual(240, features.height);
